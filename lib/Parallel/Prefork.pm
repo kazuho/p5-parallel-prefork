@@ -7,7 +7,7 @@ use base qw/Class::Accessor::Fast/;
 use List::Util qw/first/;
 use Proc::Wait3;
 
-__PACKAGE__->mk_accessors(qw/max_workers fork_delay trap_signals signals_received/);
+__PACKAGE__->mk_accessors(qw/max_workers err_respawn_interval trap_signals signals_received/);
 
 our $VERSION = '0.01';
 
@@ -15,11 +15,11 @@ sub new {
     my ($klass, $opts) = @_;
     $opts ||= {};
     my $self = bless {
-        worker_pids      => {},
-        max_workers      => 10,
-        fork_delay       => 1,
-        trap_signals     => [ qw/TERM/ ],
-        signals_received => [],
+        worker_pids          => {},
+        max_workers          => 10,
+        err_respawn_interval => 1,
+        trap_signals         => [ qw/TERM/ ],
+        signals_received     => [],
         %$opts,
     }, $klass;
     $SIG{$_} = sub {
@@ -39,8 +39,9 @@ sub start {
     
     # main loop
     while (! @{$self->signals_received}) {
+        my $pid;
         if (keys %{$self->{worker_pids}} < $self->max_workers) {
-            my $pid = fork;
+            $pid = fork;
             die 'fork error' unless defined $pid;
             unless ($pid) {
                 # child process
@@ -49,11 +50,16 @@ sub start {
                 exit 0 if @{$self->signals_received};
                 return;
             }
+            print "child $pid started\n";
             $self->{worker_pids}{$pid} = 1;
-            sleep $self->fork_delay
-                if $self->fork_delay;
-        } elsif (my ($pid) = wait3(1)) {
-            delete $self->{worker_pids}{$pid};
+        }
+        if (my ($exit_pid, $status) = wait3(! $pid)) {
+            delete $self->{worker_pids}{$exit_pid};
+            print "child $exit_pid died\n";
+            unless ($status == 0) {
+                printf STDERR "Child exist status: %08x\n", $status;
+                sleep $self->err_respawn_interval;
+            }
         }
     }
     # send SIGTERM to all workers
