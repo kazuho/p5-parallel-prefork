@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use base qw/Class::Accessor::Fast/;
+use List::Util qw/first/;
 use Proc::Wait3;
 
 __PACKAGE__->mk_accessors(qw/max_workers fork_delay trap_signals signals_received/);
@@ -76,6 +77,14 @@ sub wait_all_children {
             delete $self->{worker_pids}{$pid};
         }
     }
+}
+
+sub received_signal {
+    my ($self, @signames) = @_;
+    foreach my $rs (@{$self->signals_received}) {
+        return 1 if first { $_ eq $rs } @signames;
+    }
+    undef;
 }
 
 1;
