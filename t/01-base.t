@@ -1,0 +1,64 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+use Fcntl qw/:flock/;
+use File::Temp qw/tempfile/;
+use Test::More tests => 4;
+
+use_ok('Parallel::Prefork');
+
+my $pm;
+eval {
+    $pm = Parallel::Prefork->new({
+        max_workers => 10,
+        fork_delay  => 0,
+    });
+};
+ok($pm);
+
+my ($fh, $filename) = tempfile;
+syswrite $fh, '0', 1;
+close $fh;
+
+my $ppid = $$;
+
+my $c;
+
+while (! @{$pm->signals_received}) {
+    $pm->start and next;
+    open $fh, '+<', $filename
+        or die "failed to open temporary file: $filename: ";
+    flock $fh, LOCK_EX;
+    sysread $fh, $c, 10;
+    $c++;
+    seek $fh, 0, 0;
+    syswrite $fh, $c, length($c);
+    flock $fh, LOCK_UN;
+    local $SIG{TERM} = sub {
+        flock $fh, LOCK_EX;
+        seek $fh, 0, 0;
+        sysread $fh, $c, 10;
+        $c++;
+        seek $fh, 0, 0;
+        syswrite $fh, $c, length($c);
+        flock $fh, LOCK_UN;
+        exit 0;
+    };
+    if ($c == $pm->max_workers) {
+        kill 'TERM', $ppid;
+    }
+    sleep 100;
+    $pm->finish;
+}
+ok(1);
+$pm->wait_all_children;
+
+open $fh, '<', $filename
+    or die "failed to open temporary file: $filename: ";
+sysread $fh, $c, 10;
+close $fh;
+is($c, $pm->max_workers * 2);
+
+unlink $filename;
