@@ -44,6 +44,8 @@ sub start {
             unless ($pid) {
                 # child process
                 $self->{in_child} = 1;
+                $SIG{$_} = 'DEFAULT' for @{$self->trap_signals};
+                exit 0 if @{$self->signals_received};
                 return;
             }
             $self->{worker_pids}{$pid} = 1;
