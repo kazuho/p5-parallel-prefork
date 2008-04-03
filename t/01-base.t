@@ -26,7 +26,7 @@ my $ppid = $$;
 
 my $c;
 
-until ($pm->received_signal('TERM')) {
+until ($pm->received_signal) {
     $pm->start and next;
     open $fh, '+<', $filename
         or die "failed to open temporary file: $filename: ";

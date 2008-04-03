@@ -81,6 +81,8 @@ sub wait_all_children {
 
 sub received_signal {
     my ($self, @signames) = @_;
+    return scalar(@{$self->signals_received})
+        unless @signames;
     foreach my $rs (@{$self->signals_received}) {
         return 1 if first { $_ eq $rs } @signames;
     }
