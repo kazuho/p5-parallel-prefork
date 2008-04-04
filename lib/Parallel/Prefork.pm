@@ -21,7 +21,7 @@ sub new {
         trap_signals         => {
             TERM => 'TERM',
         },
-        signal_received      => undef,
+        signal_received      => '',
         manager_pid          => undef,
         %$opts,
     }, $klass;
@@ -35,6 +35,7 @@ sub start {
     my $self = shift;
     
     $self->manager_pid($$);
+    $self->signal_received('');
     
     die 'cannot start another process while you are in child process'
         if $self->{in_child};
