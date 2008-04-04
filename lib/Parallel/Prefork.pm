@@ -7,7 +7,7 @@ use base qw/Class::Accessor::Fast/;
 use List::Util qw/first/;
 use Proc::Wait3;
 
-__PACKAGE__->mk_accessors(qw/max_workers err_respawn_interval trap_signals signals_received/);
+__PACKAGE__->mk_accessors(qw/max_workers err_respawn_interval trap_signals signal_received manager_pid/);
 
 our $VERSION = '0.01';
 
@@ -18,18 +18,23 @@ sub new {
         worker_pids          => {},
         max_workers          => 10,
         err_respawn_interval => 1,
-        trap_signals         => [ qw/TERM/ ],
-        signals_received     => [],
+        trap_signals         => {
+            TERM => 'TERM',
+        },
+        signal_received      => undef,
+        manager_pid          => undef,
         %$opts,
     }, $klass;
     $SIG{$_} = sub {
-        push @{$self->signals_received}, $_[0];
-    } for @{$self->trap_signals};
+        $self->signal_received($_[0]);
+    } for keys %{$self->trap_signals};
     $self;
 }
 
 sub start {
     my $self = shift;
+    
+    $self->manager_pid($$);
     
     die 'cannot start another process while you are in child process'
         if $self->{in_child};
@@ -38,7 +43,7 @@ sub start {
     return if $self->{max_workers} == 0;
     
     # main loop
-    while (! @{$self->signals_received}) {
+    while (! $self->signal_received) {
         my $pid;
         if (keys %{$self->{worker_pids}} < $self->max_workers) {
             $pid = fork;
@@ -46,25 +51,22 @@ sub start {
             unless ($pid) {
                 # child process
                 $self->{in_child} = 1;
-                $SIG{$_} = 'DEFAULT' for @{$self->trap_signals};
-                exit 0 if @{$self->signals_received};
+                $SIG{$_} = 'DEFAULT' for keys %{$self->trap_signals};
+                exit 0 if $self->signal_received;
                 return;
             }
-            print "child $pid started\n";
             $self->{worker_pids}{$pid} = 1;
         }
         if (my ($exit_pid, $status) = wait3(! $pid)) {
             delete $self->{worker_pids}{$exit_pid};
-            print "child $exit_pid died\n";
             unless ($status == 0) {
-                printf STDERR "Child exist status: %08x\n", $status;
                 sleep $self->err_respawn_interval;
             }
         }
     }
-    # send SIGTERM to all workers
-    foreach my $pid (sort keys %{$self->{worker_pids}}) {
-        kill 'TERM', $pid;
+    # send signals to workers
+    if (my $sig = $self->{trap_signals}{$self->signal_received}) {
+        $self->signal_all_children($sig);
     }
     
     1; # return from parent process
@@ -76,6 +78,13 @@ sub finish {
     exit($exit_code || 0);
 }
 
+sub signal_all_children {
+    my ($self, $sig) = @_;
+    foreach my $pid (sort keys %{$self->{worker_pids}}) {
+        kill $sig, $pid;
+    }
+}
+
 sub wait_all_children {
     my $self = shift;
     while (%{$self->{worker_pids}}) {
@@ -83,16 +92,6 @@ sub wait_all_children {
             delete $self->{worker_pids}{$pid};
         }
     }
-}
-
-sub received_signal {
-    my ($self, @signames) = @_;
-    return scalar(@{$self->signals_received})
-        unless @signames;
-    foreach my $rs (@{$self->signals_received}) {
-        return 1 if first { $_ eq $rs } @signames;
-    }
-    undef;
 }
 
 1;
@@ -109,7 +108,10 @@ Parallel::Prefork - A simple prefork server framework
   my $pm = Parallel::Prefork->new({
     max_workers  => 10,
     fork_delay   => 1,
-    trap_signals => [ qw/TERM HUP/ ],
+    trap_signals => {
+      TERM => TERM,
+      HUP  => TERM,
+      USR1 => undef,
   });
   
   while ($pm->signal_received ne 'TERM') {
