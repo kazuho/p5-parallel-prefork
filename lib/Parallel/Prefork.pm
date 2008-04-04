@@ -129,6 +129,40 @@ Parallel::Prefork - A simple prefork server framework
 
 C<Parallel::Prefork> is much like C<Parallel::ForkManager>, but supports graceful shutdown and run-time reconfiguration.
 
+=head1 METHODS
+
+=head2 new
+
+Instantiation.  Takes a hashref as an argument.  Recognized attributes are as follows.
+
+=head3 max_workers
+
+number of worker processes (default: 10)
+
+=head3 err_respawn_interval
+
+interval until next child process is spawned after a worker exits abnormally (default: 1)
+
+=head3 trap_signals
+
+hashref of signals to be trapped.  Manager process will trap the signals listed in the keys of the hash, and send the signal specified in the associated value (if any) to all worker processes.
+
+=head2 start
+
+The main routine.  Returns undef in child processes.  Returns a true value within manager process upon receiving a signal specified in the C<trap_signals> hashref.
+
+=head2 finish
+
+Child processes should call this function for termination.  Takes exit code as an optional argument.  Only usable from child processes.
+
+=head2 signal_all_children
+
+Sends signal to all worker processes.  Only usable from manager process.
+
+=head2 wait_all_children
+
+Blocks until all worker processes exit.  Only usable from manager process.
+
 =head1 LICENSE
 
 This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
