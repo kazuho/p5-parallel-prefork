@@ -3,4 +3,5 @@ Makefile.PL
 MANIFEST
 README
 t/01-base.t
+t/02-reconfigure.t
 lib/Parallel/Prefork.pm
