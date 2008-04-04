@@ -23,6 +23,7 @@ sub new {
         },
         signal_received      => '',
         manager_pid          => undef,
+        generation           => 0,
         %$opts,
     }, $klass;
     $SIG{$_} = sub {
@@ -36,6 +37,7 @@ sub start {
     
     $self->manager_pid($$);
     $self->signal_received('');
+    $self->{generation}++;
     
     die 'cannot start another process while you are in child process'
         if $self->{in_child};
@@ -56,11 +58,11 @@ sub start {
                 exit 0 if $self->signal_received;
                 return;
             }
-            $self->{worker_pids}{$pid} = 1;
+            $self->{worker_pids}{$pid} = $self->{generation};
         }
         if (my ($exit_pid, $status) = wait3(! $pid)) {
-            delete $self->{worker_pids}{$exit_pid};
-            unless ($status == 0) {
+            if (delete($self->{worker_pids}{$exit_pid}) == $self->{generation}
+                    && $status != 0) {
                 sleep $self->err_respawn_interval;
             }
         }
