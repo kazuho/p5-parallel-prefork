@@ -9,7 +9,7 @@ use Proc::Wait3;
 
 __PACKAGE__->mk_accessors(qw/max_workers err_respawn_interval trap_signals signal_received manager_pid/);
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 sub new {
     my ($klass, $opts) = @_;

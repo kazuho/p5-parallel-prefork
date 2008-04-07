@@ -1,0 +1,5 @@
+0.02 - Mon Apr 07 00:00:00 JST 2008
+	- only delay respawning a new worker process if prev. exited abnormally
+
+0.01 - Fri Apr 04 00:00:00 JST 2008
+	- initial release
