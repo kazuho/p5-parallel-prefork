@@ -1,3 +1,6 @@
+0.03 - Fri Apr 11 14:30:00 JST 2008
+	- declare dependency against Class::Accessor::Fast
+
 0.02 - Mon Apr 07 00:00:00 JST 2008
 	- only delay respawning a new worker process if prev. exited abnormally
 
