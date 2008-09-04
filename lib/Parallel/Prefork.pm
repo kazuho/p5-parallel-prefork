@@ -115,6 +115,7 @@ Parallel::Prefork - A simple prefork server framework
       TERM => TERM,
       HUP  => TERM,
       USR1 => undef,
+    }
   });
   
   while ($pm->signal_received ne 'TERM') {
