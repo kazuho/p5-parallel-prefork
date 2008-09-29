@@ -7,7 +7,7 @@ use base qw/Class::Accessor::Fast/;
 use List::Util qw/first/;
 use Proc::Wait3;
 
-__PACKAGE__->mk_accessors(qw/max_workers err_respawn_interval trap_signals signal_received manager_pid/);
+__PACKAGE__->mk_accessors(qw/max_workers err_respawn_interval trap_signals signal_received manager_pid on_child_reap/);
 
 our $VERSION = '0.03';
 
@@ -61,8 +61,10 @@ sub start {
             $self->{worker_pids}{$pid} = $self->{generation};
         }
         if (my ($exit_pid, $status) = wait3(! $pid)) {
+            $self->_run_child_reap_cb( $exit_pid, $status );
+
             if (delete($self->{worker_pids}{$exit_pid}) == $self->{generation}
-                    && $status != 0) {
+                && $status != 0) {
                 sleep $self->err_respawn_interval;
             }
         }
@@ -88,11 +90,24 @@ sub signal_all_children {
     }
 }
 
+sub _run_child_reap_cb {
+    my ($self, $exit_pid, $status) = @_;
+    my $cb = $self->on_child_reap;
+    if ($cb) {
+        eval {
+            $cb->($self, $exit_pid, $status);
+        };
+        # XXX - hmph, what to do here?
+    }
+}
+
 sub wait_all_children {
     my $self = shift;
     while (%{$self->{worker_pids}}) {
         if (my $pid = wait) {
-            delete $self->{worker_pids}{$pid};
+            if (delete $self->{worker_pids}{$pid}) {
+                $self->_run_child_reap_cb($pid, $?);
+            }
         }
     }
 }
@@ -150,6 +165,11 @@ interval until next child process is spawned after a worker exits abnormally (de
 =head3 trap_signals
 
 hashref of signals to be trapped.  Manager process will trap the signals listed in the keys of the hash, and send the signal specified in the associated value (if any) to all worker processes.
+
+=head3 on_child_reap
+
+Coderef that is called when a child is reaped. Receives the instance to
+the current Paralle::Prefork, the child's pid, and its exit status.
 
 =head2 start
 

@@ -5,15 +5,19 @@ use warnings;
 
 use Fcntl qw/:flock/;
 use File::Temp qw/tempfile/;
-use Test::More tests => 4;
+use Test::More tests => 5;
 
 use_ok('Parallel::Prefork');
 
+my $reaped = 0;
 my $pm;
 eval {
     $pm = Parallel::Prefork->new({
-        max_workers => 10,
-        fork_delay  => 0,
+        max_workers   => 10,
+        fork_delay    => 0,
+        on_child_reap => sub {
+            $reaped++;
+        }
     });
 };
 ok($pm);
@@ -60,5 +64,6 @@ open $fh, '<', $filename
 sysread $fh, $c, 10;
 close $fh;
 is($c, $pm->max_workers * 2);
+is($reaped, $pm->max_workers, "properly called on_child_reap callback");
 
 unlink $filename;
