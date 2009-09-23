@@ -50,7 +50,11 @@ sub start {
         my $pid;
         if (keys %{$self->{worker_pids}} < $self->max_workers) {
             $pid = fork;
-            die 'fork error' unless defined $pid;
+            unless (defined $pid) {
+                warn "fork failed:$!";
+                sleep $self->err_respawn_interval;
+                next;
+            }
             unless ($pid) {
                 # child process
                 $self->{in_child} = 1;
