@@ -1,3 +1,6 @@
+0.05 - Wed Sep 23 20:25:00 JST 2009
+	- do not die on fork failure
+
 0.04 - Mon Sep 29 13:04:00 JST 2008
 	- add on_child_reap callback (by lestrrat)
 
