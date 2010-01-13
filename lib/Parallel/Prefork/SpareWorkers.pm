@@ -1,6 +1,13 @@
 package Parallel::Prefork::SpareWorkers;
 
+use strict;
+use warnings;
+
+use Exporter qw(import);
+
 use List::MoreUtils qw(uniq);
+
+use base qw/Parallel::Prefork/;
 
 use constant STATUS_NEXIST => '.';
 use constant STATUS_IDLE   => '_';
@@ -10,8 +17,6 @@ our %EXPORT_TAGS = (
 );
 our @EXPORT_OK = uniq sort map { @$_ } values %EXPORT_TAGS;
 $EXPORT_TAGS{all} = \@EXPORT_OK;
-
-use base qw/Parallel::Prefork Exporter/;
 
 __PACKAGE__->mk_accessors(qw/min_spare_workers max_spare_workers scoreboard/);
 
