@@ -42,14 +42,12 @@ sub start {
     die 'cannot start another process while you are in child process'
         if $self->{in_child};
     
-    # for debugging
-    return if $self->{max_workers} == 0;
-    
     # main loop
     while (! $self->signal_received) {
-        my $pid;
-        if (keys %{$self->{worker_pids}} < $self->max_workers) {
-            $pid = fork;
+        my $action = $self->_decide_action;
+        if ($action > 0) {
+            # start a new worker
+            my $pid = fork;
             unless (defined $pid) {
                 warn "fork failed:$!";
                 sleep $self->err_respawn_interval;
@@ -63,10 +61,15 @@ sub start {
                 return;
             }
             $self->{worker_pids}{$pid} = $self->{generation};
+        } elsif ($action < 0) {
+            # stop an existing worker
+            kill $self->{trap_signals}{TERM}, (keys %{$self->{worker_pids}})[0];
         }
-        if (my ($exit_pid, $status) = wait3(! $pid)) {
-            $self->_run_child_reap_cb( $exit_pid, $status );
-
+        $self->{__dbg_callback}->()
+            if $self->{__dbg_callback};
+        if (my ($exit_pid, $status)
+                = wait3(! $self->{__dbg_callback} && $action <= 0)) {
+            $self->_on_child_reap($exit_pid, $status);
             if (delete($self->{worker_pids}{$exit_pid}) == $self->{generation}
                 && $status != 0) {
                 sleep $self->err_respawn_interval;
@@ -83,7 +86,6 @@ sub start {
 
 sub finish {
     my ($self, $exit_code) = @_;
-    return unless $self->{max_workers};
     exit($exit_code || 0);
 }
 
@@ -94,7 +96,18 @@ sub signal_all_children {
     }
 }
 
-sub _run_child_reap_cb {
+sub num_workers {
+    my $self = shift;
+    return scalar keys %{$self->{worker_pids}};
+}
+
+sub _decide_action {
+    my $self = shift;
+    return 1 if $self->num_workers < $self->max_workers;
+    return 0;
+}
+
+sub _on_child_reap {
     my ($self, $exit_pid, $status) = @_;
     my $cb = $self->on_child_reap;
     if ($cb) {
@@ -110,7 +123,7 @@ sub wait_all_children {
     while (%{$self->{worker_pids}}) {
         if (my $pid = wait) {
             if (delete $self->{worker_pids}{$pid}) {
-                $self->_run_child_reap_cb($pid, $?);
+                $self->_on_child_reap($pid, $?);
             }
         }
     }
