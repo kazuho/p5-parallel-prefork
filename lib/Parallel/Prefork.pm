@@ -9,7 +9,7 @@ use Proc::Wait3;
 
 __PACKAGE__->mk_accessors(qw/max_workers err_respawn_interval trap_signals signal_received manager_pid on_child_reap/);
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 sub new {
     my ($klass, $opts) = @_;
@@ -134,6 +134,7 @@ sub wait_all_children {
 __END__
 
 =head1 NAME
+
 Parallel::Prefork - A simple prefork server framework
 
 =head1 SYNOPSIS
@@ -142,10 +143,9 @@ Parallel::Prefork - A simple prefork server framework
   
   my $pm = Parallel::Prefork->new({
     max_workers  => 10,
-    fork_delay   => 1,
     trap_signals => {
-      TERM => TERM,
-      HUP  => TERM,
+      TERM => 'TERM',
+      HUP  => 'TERM',
       USR1 => undef,
     }
   });
