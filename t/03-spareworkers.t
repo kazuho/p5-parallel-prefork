@@ -3,7 +3,7 @@ use warnings;
 
 use File::Temp qw();
 use Time::HiRes qw(sleep);
-use Test::More;
+use Test::More tests => 8;
 
 use_ok('Parallel::Prefork::SpareWorkers');
 
@@ -59,15 +59,13 @@ while ($pm->signal_received ne 'TERM') {
 
 $pm->wait_all_children;
 
-done_testing;
-
 sub wait_and_test {
     my $check_func = shift;
     my $cnt = 0;
     return sub {
         sleep 0.1;
         $cnt++;
-        return if $cnt < 10;
+        return if $cnt < 30; # 1 second until all clients update their state, plus 10 invocations to min/max the process, plus 1 second bonus
         $check_func->();
         next_test();
     };
