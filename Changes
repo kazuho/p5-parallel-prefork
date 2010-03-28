@@ -1,3 +1,6 @@
+0.08
+	- fix test (compatibility with older versions of Test::More, timing was too severe)
+
 0.07
 	- fix compilation error on perl 5.10.0
 
