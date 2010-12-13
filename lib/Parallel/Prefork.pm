@@ -5,7 +5,8 @@ use warnings;
 
 use base qw/Class::Accessor::Fast/;
 use List::Util qw/first/;
-use Proc::Wait3;
+use Proc::Wait3 ();
+use Time::HiRes ();
 
 __PACKAGE__->mk_accessors(qw/max_workers err_respawn_interval trap_signals signal_received manager_pid on_child_reap/);
 
@@ -44,6 +45,9 @@ sub start {
     
     # main loop
     while (! $self->signal_received) {
+        if (my $delayed_task = $self->{_delayed_task}) {
+            $delayed_task->($self);
+        }
         my $action = $self->_decide_action;
         if ($action > 0) {
             # start a new worker
@@ -63,12 +67,15 @@ sub start {
             $self->{worker_pids}{$pid} = $self->{generation};
         } elsif ($action < 0) {
             # stop an existing worker
-            kill $self->{trap_signals}{TERM}, (keys %{$self->{worker_pids}})[0];
+            kill(
+                $self->_action_for('TERM')->[0],
+                (keys %{$self->{worker_pids}})[0],
+            );
         }
         $self->{__dbg_callback}->()
             if $self->{__dbg_callback};
         if (my ($exit_pid, $status)
-                = wait3(! $self->{__dbg_callback} && $action <= 0)) {
+                = $self->_wait(! $self->{__dbg_callback} && $action <= 0)) {
             $self->_on_child_reap($exit_pid, $status);
             if (delete($self->{worker_pids}{$exit_pid}) == $self->{generation}
                 && $status != 0) {
@@ -77,8 +84,25 @@ sub start {
         }
     }
     # send signals to workers
-    if (my $sig = $self->{trap_signals}{$self->signal_received}) {
-        $self->signal_all_children($sig);
+    if (my $action = $self->_action_for($self->signal_received)) {
+        my ($sig, $interval) = @$action;
+        if ($interval) {
+            my @pids = sort keys %{$self->{worker_pids}};
+            $self->{delayed_task} = sub {
+                my $self = shift;
+                my $pid = shift @pids;
+                kill $sig, $pid;
+                if (@pids == 0) {
+                    delete $self->{delayed_task};
+                    delete $self->{delayed_task_at};
+                } else {
+                    $self->{delayed_task_at} = Time::HiRes::time() + $interval;
+                }
+            };
+            $self->{delayed_task}->();
+        } else {
+            $self->signal_all_children($sig);
+        }
     }
     
     1; # return from parent process
@@ -118,14 +142,59 @@ sub _on_child_reap {
     }
 }
 
+# runs delayed tasks (if any) and returns how many seconds to wait
+sub _handle_delayed_task {
+    my $self = shift;
+    while (1) {
+        return undef
+            unless $self->{delayed_task};
+        my $timeleft = $self->{delayed_task_at} - Time::HiRes::time();
+        return $timeleft
+            if $timeleft >= 0.002;
+        $self->{delayed_task}->($self);
+    }
+}
+
+# returns [sig_to_send, interval_bet_procs] or undef for given recved signal
+sub _action_for {
+    my ($self, $sig) = @_;
+    my $t = $self->{trap_signals}{$sig}
+        or return undef;
+    $t = [$t, 0] unless ref $t;
+    return $t;
+}
+
 sub wait_all_children {
     my $self = shift;
     while (%{$self->{worker_pids}}) {
-        if (my $pid = wait) {
+        if (my ($pid) = $self->_wait(1)) {
             if (delete $self->{worker_pids}{$pid}) {
                 $self->_on_child_reap($pid, $?);
             }
         }
+    }
+}
+
+# wrapper function of Proc::Wait3::wait3 that executes delayed task if any.  assumes wantarray == 1
+sub _wait {
+    my ($self, $blocking) = @_;
+    if (! $blocking) {
+        $self->_handle_delayed_task();
+        return Proc::Wait3::wait3(0);
+    } else {
+        my $sleep_secs = $self->_handle_delayed_task();
+        if (defined $sleep_secs) {
+            # wait max sleep_secs or until signalled
+            select(my $rin = '', my $win = '', my $ein = '', $sleep_secs);
+            if (my @r = Proc::Wait3::wait3(0)) {
+                return @r;
+            }
+        } else {
+            if (my @r = Proc::Wait3::wait3(1)) {
+                return @r;
+            }
+        }
+        return +();
     }
 }
 
