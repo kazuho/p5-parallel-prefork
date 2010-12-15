@@ -45,9 +45,6 @@ sub start {
     
     # main loop
     while (! $self->signal_received) {
-        if (my $delayed_task = $self->{_delayed_task}) {
-            $delayed_task->($self);
-        }
         my $action = $self->_decide_action;
         if ($action > 0) {
             # start a new worker
@@ -87,6 +84,9 @@ sub start {
     if (my $action = $self->_action_for($self->signal_received)) {
         my ($sig, $interval) = @$action;
         if ($interval) {
+            # fortunately we are the only one using delayed_task, so implement
+            # this setup code idempotent and replace the alyready-registered
+            # callback (if any)
             my @pids = sort keys %{$self->{worker_pids}};
             $self->{delayed_task} = sub {
                 my $self = shift;
