@@ -5,12 +5,14 @@ use warnings;
 
 use 5.008_001;
 
-use base qw/Class::Accessor::Fast/;
+use base qw/Class::Accessor::Lite/;
 use List::Util qw/first max min/;
 use Proc::Wait3 ();
 use Time::HiRes ();
 
-__PACKAGE__->mk_accessors(qw/max_workers spawn_interval err_respawn_interval trap_signals signal_received manager_pid on_child_reap/);
+use Class::Accessor::Lite (
+    rw => [ qw/max_workers spawn_interval err_respawn_interval trap_signals signal_received manager_pid on_child_reap/ ],
+);
 
 our $VERSION = '0.08';
 
