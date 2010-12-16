@@ -266,23 +266,27 @@ C<Parallel::Prefork> is much like C<Parallel::ForkManager>, but supports gracefu
 
 =head2 new
 
-Instantiation.  Takes a hashref as an argument.  Recognized attributes are as follows.
+instantiation.  Takes a hashref as an argument.  Recognized attributes are as follows.
 
 =head3 max_workers
 
 number of worker processes (default: 10)
 
+=head3 spawn_interval
+
+interval in seconds between spawning child processes unless a child process exits abnormally (default: 0)
+
 =head3 err_respawn_interval
 
-interval until next child process is spawned after a worker exits abnormally (default: 1)
+number of seconds to deter spawning of child processes after a worker exits abnormally (default: 1)
 
 =head3 trap_signals
 
-hashref of signals to be trapped.  Manager process will trap the signals listed in the keys of the hash, and send the signal specified in the associated value (if any) to all worker processes.
+hashref of signals to be trapped.  Manager process will trap the signals listed in the keys of the hash, and send the signal specified in the associated value (if any) to all worker processes.  If the associated value is a scalar then it is treated as the name of the signal to be sent immediately to all the worker processes.  If the value is an arrayref the first value is treated the name of the signal and the second value is treated as the interval (in seconds) between sending the signal to each worker process.
 
 =head3 on_child_reap
 
-Coderef that is called when a child is reaped. Receives the instance to
+coderef that is called when a child is reaped. Receives the instance to
 the current Paralle::Prefork, the child's pid, and its exit status.
 
 =head2 start
