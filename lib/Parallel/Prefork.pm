@@ -27,7 +27,7 @@ sub new {
         manager_pid          => undef,
         generation           => 0,
         %$opts,
-        _no_spawn_until      => 0,
+        _no_adjust_until     => 0,
     }, $klass;
     $SIG{$_} = sub {
         $self->signal_received($_[0]);
@@ -48,29 +48,32 @@ sub start {
     # main loop
     while (! $self->signal_received) {
         my $action = $self->_decide_action;
-        if ($action > 0 && $self->{_no_spawn_until} <= Time::HiRes::time()) {
-            # start a new worker
-            my $pid = fork;
-            unless (defined $pid) {
-                warn "fork failed:$!";
-                $self->_update_spawn_delay($self->err_respawn_interval);
-                next;
+        if ($action != 0 && $self->{_no_adjust_until} <= Time::HiRes::time()) {
+            if ($action > 0) {
+                # start a new worker
+                my $pid = fork;
+                unless (defined $pid) {
+                    warn "fork failed:$!";
+                    $self->_update_spawn_delay($self->err_respawn_interval);
+                    next;
+                }
+                unless ($pid) {
+                    # child process
+                    $self->{in_child} = 1;
+                    $SIG{$_} = 'DEFAULT' for keys %{$self->trap_signals};
+                    exit 0 if $self->signal_received;
+                    return;
+                }
+                $self->{worker_pids}{$pid} = $self->{generation};
+                $self->_update_spawn_delay(undef);
+            } elsif ($action < 0) {
+                # stop an existing worker
+                kill(
+                    $self->_action_for('TERM')->[0],
+                    (keys %{$self->{worker_pids}})[0],
+                );
+                $self->_update_spawn_delay($self->spawn_interval);
             }
-            unless ($pid) {
-                # child process
-                $self->{in_child} = 1;
-                $SIG{$_} = 'DEFAULT' for keys %{$self->trap_signals};
-                exit 0 if $self->signal_received;
-                return;
-            }
-            $self->{worker_pids}{$pid} = $self->{generation};
-            $self->_update_spawn_delay(undef);
-        } elsif ($action < 0) {
-            # stop an existing worker
-            kill(
-                $self->_action_for('TERM')->[0],
-                (keys %{$self->{worker_pids}})[0],
-            );
         }
         $self->{__dbg_callback}->()
             if $self->{__dbg_callback};
@@ -180,9 +183,9 @@ sub wait_all_children {
 
 sub _update_spawn_delay {
     my ($self, $secs) = @_;
-    $self->{_no_spawn_until} = $secs
+    $self->{_no_adjust_until} = $secs
         ? max(
-            $self->{_no_spawn_until},
+            $self->{_no_adjust_until},
             Time::HiRes::time() + $secs,
         ) : 0;
 }
@@ -196,7 +199,7 @@ sub _wait {
     } else {
         my $delayed_task_sleep = $self->_handle_delayed_task();
         my $delayed_fork_sleep = $self->_decide_action() > 0
-            ? max($self->{_no_spawn_until} - Time::HiRes::time(), 0)
+            ? max($self->{_no_adjust_until} - Time::HiRes::time(), 0)
                 : undef;
         my $sleep_secs = min grep { defined $_ } (
             $delayed_task_sleep,

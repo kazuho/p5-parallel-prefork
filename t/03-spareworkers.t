@@ -10,10 +10,11 @@ use_ok('Parallel::Prefork::SpareWorkers');
 my $tempdir = File::Temp::tempdir(CLEANUP => 1);
 
 my $pm = Parallel::Prefork::SpareWorkers->new({
-    min_spare_workers => 3,
-    max_spare_workers => 5,
-    max_workers       => 10,
-    trap_signals      => {
+    min_spare_workers    => 3,
+    max_spare_workers    => 5,
+    max_workers          => 10,
+    err_respawn_interval => 0,
+    trap_signals         => {
         TERM => 'TERM',
     },
 });
