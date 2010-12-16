@@ -27,7 +27,7 @@ sub new {
         manager_pid          => undef,
         generation           => 0,
         %$opts,
-        _no_adjust_until     => 0,
+        _no_adjust_until     => 0, # becomes undef in wait_all_children
     }, $klass;
     $SIG{$_} = sub {
         $self->signal_received($_[0]);
@@ -47,33 +47,32 @@ sub start {
     
     # main loop
     while (! $self->signal_received) {
-        my $action = $self->_decide_action;
-        if ($action != 0 && $self->{_no_adjust_until} <= Time::HiRes::time()) {
-            if ($action > 0) {
-                # start a new worker
-                my $pid = fork;
-                unless (defined $pid) {
-                    warn "fork failed:$!";
-                    $self->_update_spawn_delay($self->err_respawn_interval);
-                    next;
-                }
-                unless ($pid) {
-                    # child process
-                    $self->{in_child} = 1;
-                    $SIG{$_} = 'DEFAULT' for keys %{$self->trap_signals};
-                    exit 0 if $self->signal_received;
-                    return;
-                }
-                $self->{worker_pids}{$pid} = $self->{generation};
-                $self->_update_spawn_delay(undef);
-            } elsif ($action < 0) {
-                # stop an existing worker
-                kill(
-                    $self->_action_for('TERM')->[0],
-                    (keys %{$self->{worker_pids}})[0],
-                );
-                $self->_update_spawn_delay($self->spawn_interval);
+        my $action = $self->{_no_adjust_until} <= Time::HiRes::time()
+                && $self->_decide_action;
+        if ($action > 0) {
+            # start a new worker
+            my $pid = fork;
+            unless (defined $pid) {
+                warn "fork failed:$!";
+                $self->_update_spawn_delay($self->err_respawn_interval);
+                next;
             }
+            unless ($pid) {
+                # child process
+                $self->{in_child} = 1;
+                $SIG{$_} = 'DEFAULT' for keys %{$self->trap_signals};
+                exit 0 if $self->signal_received;
+                return;
+            }
+            $self->{worker_pids}{$pid} = $self->{generation};
+            $self->_update_spawn_delay($self->spawn_interval);
+        } elsif ($action < 0) {
+            # stop an existing worker
+            kill(
+                $self->_action_for('TERM')->[0],
+                (keys %{$self->{worker_pids}})[0],
+            );
+            $self->_update_spawn_delay($self->spawn_interval);
         }
         $self->{__dbg_callback}->()
             if $self->{__dbg_callback};
@@ -105,7 +104,8 @@ sub start {
                     $self->{delayed_task_at} = Time::HiRes::time() + $interval;
                 }
             };
-            $self->{delayed_task}->();
+            $self->{delayed_task_at} = 0;
+            $self->{delayed_task}->($self);
         } else {
             $self->signal_all_children($sig);
         }
@@ -172,6 +172,7 @@ sub _action_for {
 
 sub wait_all_children {
     my $self = shift;
+    $self->{_no_adjust_until} = undef;
     while (%{$self->{worker_pids}}) {
         if (my ($pid) = $self->_wait(1)) {
             if (delete $self->{worker_pids}{$pid}) {
@@ -198,16 +199,17 @@ sub _wait {
         return Proc::Wait3::wait3(0);
     } else {
         my $delayed_task_sleep = $self->_handle_delayed_task();
-        my $delayed_fork_sleep = $self->_decide_action() > 0
-            ? max($self->{_no_adjust_until} - Time::HiRes::time(), 0)
-                : undef;
+        my $delayed_fork_sleep =
+            $self->_decide_action() > 0 && defined $self->{_no_adjust_until}
+                ? max($self->{_no_adjust_until} - Time::HiRes::time(), 0)
+                    : undef;
         my $sleep_secs = min grep { defined $_ } (
             $delayed_task_sleep,
             $delayed_fork_sleep,
         );
         if (defined $sleep_secs) {
             # wait max sleep_secs or until signalled
-            select(my $rin = '', my $win = '', my $ein = '', $sleep_secs);
+            select(undef, undef, undef, $sleep_secs);
             if (my @r = Proc::Wait3::wait3(0)) {
                 return @r;
             }
