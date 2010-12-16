@@ -4,11 +4,11 @@ use strict;
 use warnings;
 
 use base qw/Class::Accessor::Fast/;
-use List::Util qw/first/;
+use List::Util qw/first max min/;
 use Proc::Wait3 ();
 use Time::HiRes ();
 
-__PACKAGE__->mk_accessors(qw/max_workers err_respawn_interval trap_signals signal_received manager_pid on_child_reap/);
+__PACKAGE__->mk_accessors(qw/max_workers spawn_interval err_respawn_interval trap_signals signal_received manager_pid on_child_reap/);
 
 our $VERSION = '0.08';
 
@@ -18,6 +18,7 @@ sub new {
     my $self = bless {
         worker_pids          => {},
         max_workers          => 10,
+        spawn_interval       => 0,
         err_respawn_interval => 1,
         trap_signals         => {
             TERM => 'TERM',
@@ -26,6 +27,7 @@ sub new {
         manager_pid          => undef,
         generation           => 0,
         %$opts,
+        _no_spawn_until      => 0,
     }, $klass;
     $SIG{$_} = sub {
         $self->signal_received($_[0]);
@@ -46,12 +48,12 @@ sub start {
     # main loop
     while (! $self->signal_received) {
         my $action = $self->_decide_action;
-        if ($action > 0) {
+        if ($action > 0 && $self->{_no_spawn_until} <= Time::HiRes::time()) {
             # start a new worker
             my $pid = fork;
             unless (defined $pid) {
                 warn "fork failed:$!";
-                sleep $self->err_respawn_interval;
+                $self->_update_spawn_delay($self->err_respawn_interval);
                 next;
             }
             unless ($pid) {
@@ -62,6 +64,7 @@ sub start {
                 return;
             }
             $self->{worker_pids}{$pid} = $self->{generation};
+            $self->_update_spawn_delay(undef);
         } elsif ($action < 0) {
             # stop an existing worker
             kill(
@@ -76,7 +79,7 @@ sub start {
             $self->_on_child_reap($exit_pid, $status);
             if (delete($self->{worker_pids}{$exit_pid}) == $self->{generation}
                 && $status != 0) {
-                sleep $self->err_respawn_interval;
+                $self->_update_spawn_delay($self->err_respawn_interval);
             }
         }
     }
@@ -150,7 +153,7 @@ sub _handle_delayed_task {
             unless $self->{delayed_task};
         my $timeleft = $self->{delayed_task_at} - Time::HiRes::time();
         return $timeleft
-            if $timeleft >= 0.002;
+            if $timeleft > 0;
         $self->{delayed_task}->($self);
     }
 }
@@ -175,6 +178,15 @@ sub wait_all_children {
     }
 }
 
+sub _update_spawn_delay {
+    my ($self, $secs) = @_;
+    $self->{_no_spawn_until} = $secs
+        ? max(
+            $self->{_no_spawn_until},
+            Time::HiRes::time() + $secs,
+        ) : 0;
+}
+
 # wrapper function of Proc::Wait3::wait3 that executes delayed task if any.  assumes wantarray == 1
 sub _wait {
     my ($self, $blocking) = @_;
@@ -182,7 +194,14 @@ sub _wait {
         $self->_handle_delayed_task();
         return Proc::Wait3::wait3(0);
     } else {
-        my $sleep_secs = $self->_handle_delayed_task();
+        my $delayed_task_sleep = $self->_handle_delayed_task();
+        my $delayed_fork_sleep = $self->_decide_action() > 0
+            ? max($self->{_no_spawn_until} - Time::HiRes::time(), 0)
+                : undef;
+        my $sleep_secs = min grep { defined $_ } (
+            $delayed_task_sleep,
+            $delayed_fork_sleep,
+        );
         if (defined $sleep_secs) {
             # wait max sleep_secs or until signalled
             select(my $rin = '', my $win = '', my $ein = '', $sleep_secs);
