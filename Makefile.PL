@@ -1,15 +1,12 @@
-use ExtUtils::MakeMaker;
+use inc::Module::Install;
 
-WriteMakefile(
-    NAME          => 'Parallel::Prefork',
-    VERSION_FROM  => 'lib/Parallel/Prefork.pm',
-    PREREQ_PM     => {
-        Class::Accessor::Fast => 0.31,
-        List::MoreUtils       => 0,
-        Proc::Wait3           => 0.03,
-        Scope::Guard          => 0,
-        Time::HiRes           => 0,
-    },
-    ABSTRACT_FROM => 'lib/Parallel/Prefork.pm',
-    AUTHOR        => 'Kazuho Oku',
-);
+all_from 'lib/Parallel/Prefork.pm';
+readme_from 'lib/Parallel/Prefork.pm';
+
+requires 'Class::Accessor::Fast' => 0.31;
+requires 'List::MoreUtils';
+requires 'Proc::Wait3' => 0.03;
+requires 'Scope::Guard';
+test_requires 'Test::Requires';
+
+WriteAll;

@@ -3,6 +3,8 @@ package Parallel::Prefork;
 use strict;
 use warnings;
 
+use 5.008_001;
+
 use base qw/Class::Accessor::Fast/;
 use List::Util qw/first max min/;
 use Proc::Wait3 ();
@@ -296,6 +298,10 @@ Sends signal to all worker processes.  Only usable from manager process.
 =head2 wait_all_children
 
 Blocks until all worker processes exit.  Only usable from manager process.
+
+=head1 AUTHOR
+
+Kazuho Oku
 
 =head1 LICENSE
 

@@ -1,37 +1,76 @@
-Parallel-Prefork version 0.05
-=============================
+NAME
+    Parallel::Prefork - A simple prefork server framework
 
-The README is used to introduce the module and provide instructions on
-how to install the module, any machine dependencies it may have (for
-example C compilers and installed libraries) and any other information
-that should be provided before the module is installed.
+SYNOPSIS
+      use Parallel::Prefork;
+  
+      my $pm = Parallel::Prefork->new({
+        max_workers  => 10,
+        trap_signals => {
+          TERM => 'TERM',
+          HUP  => 'TERM',
+          USR1 => undef,
+        }
+      });
+  
+      while ($pm->signal_received ne 'TERM') {
+        load_config();
+        $pm->start and next;
+    
+        ... do some work within the child process ...
+    
+        $pm->finish;
+      }
+  
+      $pm->wait_all_children();
 
-A README file is required for CPAN modules since CPAN extracts the
-README file from a module distribution so that people browsing the
-archive can use it get an idea of the modules uses. It is usually a
-good idea to provide version information here so that people can
-decide whether fixes for the module are worth downloading.
+DESCRIPTION
+    "Parallel::Prefork" is much like "Parallel::ForkManager", but supports
+    graceful shutdown and run-time reconfiguration.
 
-INSTALLATION
+METHODS
+  new
+    Instantiation. Takes a hashref as an argument. Recognized attributes are
+    as follows.
 
-To install this module type the following:
+   max_workers
+    number of worker processes (default: 10)
 
-   perl Makefile.PL
-   make
-   make test
-   make install
+   err_respawn_interval
+    interval until next child process is spawned after a worker exits
+    abnormally (default: 1)
 
-DEPENDENCIES
+   trap_signals
+    hashref of signals to be trapped. Manager process will trap the signals
+    listed in the keys of the hash, and send the signal specified in the
+    associated value (if any) to all worker processes.
 
-This module requires these other modules and libraries:
+   on_child_reap
+    Coderef that is called when a child is reaped. Receives the instance to
+    the current Paralle::Prefork, the child's pid, and its exit status.
 
-  Proc::Wait3
+  start
+    The main routine. Returns undef in child processes. Returns a true value
+    within manager process upon receiving a signal specified in the
+    "trap_signals" hashref.
 
-COPYRIGHT AND LICENCE
+  finish
+    Child processes should call this function for termination. Takes exit
+    code as an optional argument. Only usable from child processes.
 
-Put the correct copyright and licence information here.
+  signal_all_children
+    Sends signal to all worker processes. Only usable from manager process.
 
-Copyright (C) 2008-2010 by Cybozu Labs, Inc.
+  wait_all_children
+    Blocks until all worker processes exit. Only usable from manager
+    process.
 
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
+AUTHOR
+    Kazuho Oku
+
+LICENSE
+    This program is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself.
+
+    See http://www.perl.com/perl/misc/Artistic.html
+
