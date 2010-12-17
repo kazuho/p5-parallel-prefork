@@ -104,10 +104,10 @@ Parallel::Prefork::SpareWorkers - A prefork server framework with support for (m
     
     # do what ever you like, as follows
     while (my $sock = $listener->accept()) {
-      $pm->set_state('A');
+      $pm->set_status('A');
       ...
       $sock->close();
-      $pm->set_state(STATUS_IDLE);
+      $pm->set_status(STATUS_IDLE);
     }
     
     $pm->finish;
@@ -137,7 +137,7 @@ maxmum number of spare workers (default: max_workers)
 
 filename of scoreboard.  If not set, C<Parallel::Prefork::SpareWorkers> will create a temporary file.
 
-=head2 set_state
+=head2 set_status
 
 sets a single-byte character state of the worker process.  Worker processes should set any character of their choice using the function (but not one of the reserved characters) to declare that it is running some kind of task.  Or the state should be set to C<STATUS_IDLE> '_' once the worker enters idle state.  The other reserved character is C<STATUS_NEXIST> '.' which should never be set directly by applications.
 
