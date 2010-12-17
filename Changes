@@ -1,3 +1,8 @@
+Revision history for Perl extension Parallel::Prefork.
+
+0.09
+	- support for slow startup (with the new spawn_interval parameter) and slow shutdown (by passing arrayrefs as values of the trap_signals hashref)
+
 0.08
 	- fix test (compatibility with older versions of Test::More, timing was too severe)
 

@@ -14,7 +14,7 @@ use Class::Accessor::Lite (
     rw => [ qw/max_workers spawn_interval err_respawn_interval trap_signals signal_received manager_pid on_child_reap/ ],
 );
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 sub new {
     my $klass = shift;
