@@ -17,8 +17,8 @@ use Class::Accessor::Lite (
 our $VERSION = '0.08';
 
 sub new {
-    my ($klass, $opts) = @_;
-    $opts ||= {};
+    my $klass = shift;
+    my $opts = @_ == 1 ? $_[0] : +{ @_ };
     my $self = bless {
         worker_pids          => {},
         max_workers          => 10,
