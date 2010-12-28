@@ -23,14 +23,16 @@ my $c = 0;
 
 while ($pm->signal_received ne 'TERM') {
     $c++;
-    $pm->start and next;
-    sleep 1;
-    if ($c == 1) {
-        kill 'HUP', $pm->manager_pid;
-    } else {
-        kill 'TERM', $pm->manager_pid;
-    }
-    $pm->finish;
+    $pm->start(
+        sub {
+            sleep 1;
+            if ($c == 1) {
+                kill 'HUP', $pm->manager_pid;
+            } else {
+                kill 'TERM', $pm->manager_pid;
+            }
+        },
+    );
 }
 $pm->wait_all_children;
 

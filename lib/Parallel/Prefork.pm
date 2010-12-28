@@ -41,7 +41,7 @@ sub new {
 }
 
 sub start {
-    my $self = shift;
+    my ($self, $cb) = @_;
     
     $self->manager_pid($$);
     $self->signal_received('');
@@ -68,6 +68,10 @@ sub start {
                 $SIG{$_} = 'DEFAULT' for keys %{$self->trap_signals};
                 $SIG{CHLD} = undef; # revert to original
                 exit 0 if $self->signal_received;
+                if ($cb) {
+                    $cb->();
+                    $self->finish();
+                }
                 return;
             }
             $self->{worker_pids}{$pid} = $self->{generation};
@@ -122,6 +126,8 @@ sub start {
 
 sub finish {
     my ($self, $exit_code) = @_;
+    die "\$parallel_prefork->finish() shouln't be called within the manager process\n"
+        if $self->manager_pid() == $$;
     exit($exit_code || 0);
 }
 
@@ -247,11 +253,9 @@ Parallel::Prefork - A simple prefork server framework
   
   while ($pm->signal_received ne 'TERM') {
     load_config();
-    $pm->start and next;
-    
-    ... do some work within the child process ...
-    
-    $pm->finish;
+    $pm->start(sub {
+        ... do some work within the child process ...
+    });
   }
   
   $pm->wait_all_children();
@@ -289,11 +293,17 @@ the current Paralle::Prefork, the child's pid, and its exit status.
 
 =head2 start
 
-The main routine.  Returns undef in child processes.  Returns a true value within manager process upon receiving a signal specified in the C<trap_signals> hashref.
+The main routine.  There are two ways to use the function.
+
+If given a subref as an argument, forks child processes and executes that subref within the child processes.  The processes will exit with 0 status when the subref returns.
+
+The other way is to not give any arguments to the function.  The function returns undef in child processes.  Caller should execute the application logic and then call C<finish> to terminate the process.
+
+The C<start> function returns true within manager process upon receiving a signal specified in the C<trap_signals> hashref.
 
 =head2 finish
 
-Child processes should call this function for termination.  Takes exit code as an optional argument.  Only usable from child processes.
+Child processes (when executed by a zero-argument call to C<start>) should call this function for termination.  Takes exit code as an optional argument.  Only usable from child processes.
 
 =head2 signal_all_children
 
