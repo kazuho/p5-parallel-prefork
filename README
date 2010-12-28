@@ -15,11 +15,9 @@ SYNOPSIS
   
       while ($pm->signal_received ne 'TERM') {
         load_config();
-        $pm->start and next;
-    
-        ... do some work within the child process ...
-    
-        $pm->finish;
+        $pm->start(sub {
+            ... do some work within the child process ...
+        });
       }
   
       $pm->wait_all_children();
@@ -59,13 +57,23 @@ METHODS
     the current Paralle::Prefork, the child's pid, and its exit status.
 
   start
-    The main routine. Returns undef in child processes. Returns a true value
-    within manager process upon receiving a signal specified in the
-    "trap_signals" hashref.
+    The main routine. There are two ways to use the function.
+
+    If given a subref as an argument, forks child processes and executes
+    that subref within the child processes. The processes will exit with 0
+    status when the subref returns.
+
+    The other way is to not give any arguments to the function. The function
+    returns undef in child processes. Caller should execute the application
+    logic and then call "finish" to terminate the process.
+
+    The "start" function returns true within manager process upon receiving
+    a signal specified in the "trap_signals" hashref.
 
   finish
-    Child processes should call this function for termination. Takes exit
-    code as an optional argument. Only usable from child processes.
+    Child processes (when executed by a zero-argument call to "start")
+    should call this function for termination. Takes exit code as an
+    optional argument. Only usable from child processes.
 
   signal_all_children
     Sends signal to all worker processes. Only usable from manager process.
