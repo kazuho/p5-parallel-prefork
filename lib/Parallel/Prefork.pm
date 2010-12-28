@@ -66,6 +66,7 @@ sub start {
                 # child process
                 $self->{in_child} = 1;
                 $SIG{$_} = 'DEFAULT' for keys %{$self->trap_signals};
+                $SIG{CHLD} = undef; # revert to original
                 exit 0 if $self->signal_received;
                 return;
             }
