@@ -36,6 +36,7 @@ sub new {
     $SIG{$_} = sub {
         $self->signal_received($_[0]);
     } for keys %{$self->trap_signals};
+    $SIG{CHLD} = sub {};
     $self;
 }
 
