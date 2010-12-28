@@ -189,11 +189,7 @@ sub wait_all_children {
 
 sub _update_spawn_delay {
     my ($self, $secs) = @_;
-    $self->{_no_adjust_until} = $secs
-        ? max(
-            $self->{_no_adjust_until},
-            Time::HiRes::time() + $secs,
-        ) : 0;
+    $self->{_no_adjust_until} = $secs ? Time::HiRes::time() + $secs : 0;
 }
 
 # wrapper function of Proc::Wait3::wait3 that executes delayed task if any.  assumes wantarray == 1
