@@ -1,5 +1,8 @@
 Revision history for Perl extension Parallel::Prefork.
 
+0.11
+	- suppress warning in perl < 5.10
+
 0.10
 	- support new style: $pm->start(sub { ... }) (thanks to confound)
 	- collect zombie processes without any delay when spawn_interval is nonzero
