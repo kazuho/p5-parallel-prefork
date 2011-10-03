@@ -56,6 +56,7 @@ sub start {
                 && $self->_decide_action;
         if ($action > 0) {
             # start a new worker
+            $self->{before_fork}->($self) if $self->{before_fork};
             my $pid = fork;
             unless (defined $pid) {
                 warn "fork failed:$!";
@@ -74,6 +75,7 @@ sub start {
                 }
                 return;
             }
+            $self->{after_fork}->($self, $pid) if $self->{after_fork};
             $self->{worker_pids}{$pid} = $self->{generation};
             $self->_update_spawn_delay($self->spawn_interval);
         } elsif ($action < 0) {
