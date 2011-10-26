@@ -56,6 +56,11 @@ METHODS
     coderef that is called when a child is reaped. Receives the instance to
     the current Paralle::Prefork, the child's pid, and its exit status.
 
+   before_fork
+   after_fork
+    coderefs that are called in the manager process before and after fork,
+    if being set
+
   start
     The main routine. There are two ways to use the function.
 
