@@ -8,5 +8,6 @@ requires 'List::MoreUtils';
 requires 'Proc::Wait3' => 0.03;
 requires 'Scope::Guard';
 test_requires 'Test::Requires';
+test_requires 'Test::SharedFork';
 
 WriteAll;
