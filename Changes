@@ -1,5 +1,8 @@
 Revision history for Perl extension Parallel::Prefork.
 
+0.13
+	- repackage 0.12 (tar xf fails with 0.12 on some platforms)
+
 0.12
 	- support for pre/post fork callbacks
 
