@@ -106,7 +106,7 @@ sub start {
         my ($sig, $interval) = @$action;
         if ($interval) {
             # fortunately we are the only one using delayed_task, so implement
-            # this setup code idempotent and replace the alyready-registered
+            # this setup code idempotent and replace the already-registered
             # callback (if any)
             my @pids = sort keys %{$self->{worker_pids}};
             $self->{delayed_task} = sub {
@@ -295,7 +295,7 @@ hashref of signals to be trapped.  Manager process will trap the signals listed 
 =head3 on_child_reap
 
 coderef that is called when a child is reaped. Receives the instance to
-the current Paralle::Prefork, the child's pid, and its exit status.
+the current Parallel::Prefork, the child's pid, and its exit status.
 
 =head3 before_fork
 
