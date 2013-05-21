@@ -98,7 +98,7 @@ Parallel::Prefork::SpareWorkers - A prefork server framework with support for (m
     },
   });
   
-  while ($pm->signal_recieived ne 'TERM') {
+  while ($pm->signal_received ne 'TERM') {
     load_config();
     $pm->start and next;
     
