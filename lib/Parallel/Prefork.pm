@@ -220,6 +220,7 @@ sub _wait {
         my $sleep_secs = min grep { defined $_ } (
             $delayed_task_sleep,
             $delayed_fork_sleep,
+            $self->_max_wait(),
         );
         if (defined $sleep_secs) {
             # wait max sleep_secs or until signalled
@@ -234,6 +235,10 @@ sub _wait {
         }
         return +();
     }
+}
+
+sub _max_wait {
+    return undef;
 }
 
 1;
