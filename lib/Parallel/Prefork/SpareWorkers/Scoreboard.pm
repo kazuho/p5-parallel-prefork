@@ -7,6 +7,7 @@ use Fcntl qw(:DEFAULT :flock);
 use File::Temp qw();
 use POSIX qw(SEEK_SET);
 use Scope::Guard;
+use Signal::Mask;
 
 use Parallel::Prefork::SpareWorkers qw(:status);
 
@@ -37,6 +38,8 @@ sub new {
 }
 
 sub get_statuses {
+    local ($Signal::Mask{CHLD}, $Signal::Mask{TERM}, $Signal::Mask{INT}) = (1, 1, 1);
+
     my $self = shift;
     sysseek $self->{fh}, 0, SEEK_SET
         or die "seek failed:$!";
@@ -49,6 +52,8 @@ sub get_statuses {
 }
 
 sub clear_child {
+    local ($Signal::Mask{CHLD}, $Signal::Mask{TERM}, $Signal::Mask{INT}) = (1, 1, 1);
+
     my ($self, $pid) = @_;
     my $lock = $self->_lock_file;
     sysseek $self->{fh}, 0, SEEK_SET
@@ -70,6 +75,8 @@ sub clear_child {
 }
 
 sub child_start {
+    local ($Signal::Mask{CHLD}, $Signal::Mask{TERM}, $Signal::Mask{INT}) = (1, 1, 1);
+
     my $self = shift;
     die "child_start cannot be called twite"
         if defined $self->{slot};
