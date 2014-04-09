@@ -18,7 +18,7 @@ our %EXPORT_TAGS = (
 our @EXPORT_OK = uniq sort map { @$_ } values %EXPORT_TAGS;
 $EXPORT_TAGS{all} = \@EXPORT_OK;
 
-__PACKAGE__->mk_accessors(qw/min_spare_workers max_spare_workers scoreboard/);
+__PACKAGE__->mk_accessors(qw/min_spare_workers max_spare_workers scoreboard heartbeat/);
 
 sub new {
     my $klass = shift;
@@ -26,6 +26,7 @@ sub new {
     die "mandatory option min_spare_workers not set"
         unless $self->{min_spare_workers};
     $self->{max_spare_workers} ||= $self->max_workers;
+    $self->{heartbeat} ||= 0.25;
     $self->{scoreboard} ||= do {
         require 'Parallel/Prefork/SpareWorkers/Scoreboard.pm';
         Parallel::Prefork::SpareWorkers::Scoreboard->new(
@@ -74,6 +75,11 @@ sub _on_child_reap {
     my ($self, $exit_pid, $status) = @_;
     $self->SUPER::_on_child_reap($exit_pid, $status);
     $self->scoreboard->clear_child($exit_pid);
+}
+
+sub _max_wait {
+    my $self = shift;
+    return $self->{heartbeat};
 }
 
 1;
@@ -132,6 +138,10 @@ minimum number of spare workers (mandatory)
 =head3 max_spare_workers
 
 maxmum number of spare workers (default: max_workers)
+
+=head3 heartbeat
+
+a fractional period (in seconds) of child amount checking. Do not use very small numbers to avoid frequent use of CPU (default: 0.25)
 
 =head3 scoreboard_file
 
