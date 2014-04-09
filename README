@@ -54,7 +54,7 @@ METHODS
 
    on_child_reap
     coderef that is called when a child is reaped. Receives the instance to
-    the current Paralle::Prefork, the child's pid, and its exit status.
+    the current Parallel::Prefork, the child's pid, and its exit status.
 
    before_fork
    after_fork
