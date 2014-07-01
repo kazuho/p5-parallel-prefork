@@ -10,6 +10,8 @@ use List::Util qw/first max min/;
 use Proc::Wait3 ();
 use Time::HiRes ();
 
+use constant DEFAULT_WAIT_INTERVAL => 0.01;
+
 use Class::Accessor::Lite (
     rw => [ qw/max_workers spawn_interval err_respawn_interval trap_signals signal_received manager_pid on_child_reap before_fork after_fork/ ],
 );
@@ -199,6 +201,32 @@ sub wait_all_children {
         }
     }
 }
+
+sub wait_all_children_with_timeout {
+    my ($self, $timeout, $interval) = @_;
+    return $self->wait_all_children() if !defined $timeout || $timeout <= 0;
+    $interval ||= DEFAULT_WAIT_INTERVAL;
+
+    $self->{_no_adjust_until} = undef;
+
+    my $start_at = [Time::HiRes::gettimeofday];
+    while (Time::HiRes::tv_interval($start_at) < $timeout) {
+        # FIXME: non-blocking wait_all_children
+        #        TODO: pull-req to Parallel::Prefork
+        if (my ($pid) = $self->_wait(0)) {
+            if (delete $self->{worker_pids}{$pid}) {
+                $self->_on_child_reap($pid, $?);
+            }
+        }
+        last unless $self->num_workers;
+    }
+    continue {
+        Time::HiRes::sleep $interval;
+    }
+
+    return $self->num_workers;
+}
+
 
 sub _update_spawn_delay {
     my ($self, $secs) = @_;
