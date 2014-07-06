@@ -211,8 +211,6 @@ sub wait_all_children_with_timeout {
 
     my $start_at = [Time::HiRes::gettimeofday];
     while (Time::HiRes::tv_interval($start_at) < $timeout) {
-        # FIXME: non-blocking wait_all_children
-        #        TODO: pull-req to Parallel::Prefork
         if (my ($pid) = $self->_wait(0)) {
             if (delete $self->{worker_pids}{$pid}) {
                 $self->_on_child_reap($pid, $?);
