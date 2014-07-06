@@ -358,6 +358,11 @@ Sends signal to all worker processes.  Only usable from manager process.
 
 Blocks until all worker processes exit.  Only usable from manager process.
 
+=head2 wait_all_children_with_timeout($timeout, $interval = 0.01)
+
+Blocks until all worker processes exit or after C<$timeout> seconds.  Only usable from manager process.
+It repeated wait at predetermined intervals internally.  To change the interval, specify interval by second argument.
+
 =head1 AUTHOR
 
 Kazuho Oku
