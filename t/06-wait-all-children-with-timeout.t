@@ -38,9 +38,9 @@ until ($pm->signal_received) {
 
     $pm->finish;
 }
-is $pm->wait_all_children_with_timeout(1), 2, 'should reap one worker.';
+is $pm->wait_all_children(1), 2, 'should reap one worker.';
 $pm->signal_all_children('TERM');
-is $pm->wait_all_children_with_timeout(1), 1, 'should reap one worker.';
+is $pm->wait_all_children(1), 1, 'should reap one worker.';
 $pm->signal_all_children('TERM');
 $pm->wait_all_children();
 is $pm->num_workers, 0, 'all workers reaped.';
