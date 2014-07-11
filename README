@@ -83,9 +83,11 @@ METHODS
   signal_all_children
     Sends signal to all worker processes. Only usable from manager process.
 
-  wait_all_children
-    Blocks until all worker processes exit. Only usable from manager
-    process.
+  wait_all_children()
+  wait_all_children($timeout)
+    Waits until all worker processes exit or timeout (given as an optional
+    argument in seconds) exceeds. The method returns the number of the
+    worker processes still running.
 
 AUTHOR
     Kazuho Oku

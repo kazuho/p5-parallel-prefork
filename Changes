@@ -1,5 +1,8 @@
 Revision history for Perl extension Parallel::Prefork.
 
+0.16
+	- $pm->wait_all_children takes an optional argument specifying a timeout value (in seconds) (by karupanerura)
+
 0.15
 	- fix bug in Parallel::Prefork::SpareWorkers that did not spawn proceses up to the given maximum number
 	- fix crash in Parallel::Prefork::SpareWorkers when it receives a signal while reading the status file (by Perlover)
