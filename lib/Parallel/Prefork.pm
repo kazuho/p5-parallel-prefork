@@ -189,15 +189,33 @@ sub _action_for {
 }
 
 sub wait_all_children {
-    my $self = shift;
+    my ($self, $timeout) = @_;
     $self->{_no_adjust_until} = undef;
-    while (%{$self->{worker_pids}}) {
-        if (my ($pid) = $self->_wait(1)) {
+
+    my $call_wait = sub {
+        my $blocking = shift;
+        if (my ($pid) = $self->_wait($blocking)) {
             if (delete $self->{worker_pids}{$pid}) {
                 $self->_on_child_reap($pid, $?);
             }
         }
+    };
+
+    if ($timeout) {
+        # the strategy is to use waitpid + sleep that gets interrupted by SIGCHLD
+        # but since there is a race condition bet. waitpid and sleep, the argument
+        # to sleep should be set to a small number (and we use 1 second).
+        my $start_at = [Time::HiRes::gettimeofday];
+        while ($self->num_workers != 0 && Time::HiRes::tv_interval($start_at) < $timeout) {
+            $call_wait->(0);
+            sleep 1;
+        }
+    } else {
+        while ($self->num_workers != 0) {
+            $call_wait->(1);
+        }
     }
+    return $self->num_workers;
 }
 
 sub _update_spawn_delay {
@@ -326,9 +344,12 @@ Child processes (when executed by a zero-argument call to C<start>) should call 
 
 Sends signal to all worker processes.  Only usable from manager process.
 
-=head2 wait_all_children
+=head2 wait_all_children()
 
-Blocks until all worker processes exit.  Only usable from manager process.
+=head2 wait_all_children($timeout)
+
+Waits until all worker processes exit or timeout (given as an optional argument in seconds) exceeds.
+The method returns the number of the worker processes still running.
 
 =head1 AUTHOR
 
