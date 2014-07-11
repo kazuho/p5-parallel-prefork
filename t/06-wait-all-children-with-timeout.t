@@ -34,7 +34,7 @@ until ($pm->signal_received) {
         kill 'TERM', $manager_pid;
     }
 
-    1 while $rcv < $sig_retain_cnt;
+    sleep(100) while $rcv < $sig_retain_cnt;
 
     $pm->finish;
 }
