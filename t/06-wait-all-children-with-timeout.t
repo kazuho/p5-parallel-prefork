@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Fcntl qw/:flock/;
+use File::Temp qw/tempfile/;
 use Test::More tests => 4;
 
 use Parallel::Prefork;
@@ -17,24 +18,33 @@ my $pm = Parallel::Prefork->new({
     }
 });
 
-my $sig_retain_cnt = 1;
-$pm->after_fork(sub {
-    $sig_retain_cnt++;
-});
+my ($fh, $filename) = tempfile;
+syswrite $fh, '0', 1;
+close $fh;
 
 my $manager_pid = $$;
 
 until ($pm->signal_received) {
     $pm->start and next;
 
+    open my $fh, '+<', $filename
+        or die "failed to open temporary file: $filename: ";
+    flock $fh, LOCK_EX;
+    sysread $fh, my $c, 10;
+    $c++;
+    seek $fh, 0, 0;
+    syswrite $fh, $c, length($c);
+    flock $fh, LOCK_UN;
+    close $fh;
+
     my $rcv = 0;
     local $SIG{TERM} = sub { $rcv++ };
 
-    if ($sig_retain_cnt == $pm->max_workers) {
+    if ($c == $pm->max_workers) {
         kill 'TERM', $manager_pid;
     }
 
-    sleep(100) while $rcv < $sig_retain_cnt;
+    sleep(100) while $rcv < $c;
 
     $pm->finish;
 }
@@ -46,3 +56,5 @@ $pm->wait_all_children();
 is $pm->num_workers, 0, 'all workers reaped.';
 
 is($reaped, $pm->max_workers, "properly called on_child_reap callback");
+
+unlink $filename;
