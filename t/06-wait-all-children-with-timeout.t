@@ -22,7 +22,8 @@ my ($fh, $filename) = tempfile;
 syswrite $fh, '0', 1;
 close $fh;
 
-my $ppid = $$;
+my $manager_pid = $$;
+
 until ($pm->signal_received) {
     $pm->start and next;
 
@@ -40,7 +41,7 @@ until ($pm->signal_received) {
     local $SIG{TERM} = sub { $rcv++ };
 
     if ($c == $pm->max_workers) {
-        kill 'TERM', $ppid;
+        kill 'TERM', $manager_pid;
     }
 
     1 while $rcv < $c;
