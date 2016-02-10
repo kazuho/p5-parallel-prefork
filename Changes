@@ -1,5 +1,8 @@
 Revision history for Perl extension Parallel::Prefork.
 
+0.18
+	- fix the broken $pm->wait_all_children without timeout (by shogo82148)
+
 0.17
 	- fix the broken $pm->wait_all_children with timeout
 
