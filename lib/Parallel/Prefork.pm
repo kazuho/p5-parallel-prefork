@@ -192,32 +192,31 @@ sub wait_all_children {
     my ($self, $timeout) = @_;
     $self->{_no_adjust_until} = undef;
 
-    my $wait_loop = sub {
-        while (%{$self->{worker_pids}}) {
-            if (my ($pid) = $self->_wait(1)) {
-                if (delete $self->{worker_pids}{$pid}) {
-                    $self->_on_child_reap($pid, $?);
-                }
+    my $call_wait = sub {
+        my $blocking = shift;
+        if (my ($pid) = $self->_wait($blocking)) {
+            if (delete $self->{worker_pids}{$pid}) {
+                $self->_on_child_reap($pid, $?);
             }
+            return $pid;
         }
+        return;
     };
 
     if ($timeout) {
-        local $@;
-        my $is_timeout = 0;
-        eval {
-            local $SIG{ALRM} = sub {
-                $is_timeout = 1;
-                die "timeout";
-            };
-            alarm($timeout);
-            $wait_loop->();
-            alarm(0);
-        };
-        die $@
-            if $@ && ! $is_timeout;
+        # the strategy is to use waitpid + sleep that gets interrupted by SIGCHLD
+        # but since there is a race condition bet. waitpid and sleep, the argument
+        # to sleep should be set to a small number (and we use 1 second).
+        my $start_at = [Time::HiRes::gettimeofday];
+        while ($self->num_workers != 0 && Time::HiRes::tv_interval($start_at) < $timeout) {
+            unless ($call_wait->(0)) {
+                sleep 1;
+            }
+        }
     } else {
-        $wait_loop->();
+        while ($self->num_workers != 0) {
+            $call_wait->(1);
+        }
     }
     return $self->num_workers;
 }
